@@ -1,0 +1,63 @@
+services:
+  postgres:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_DB: varuna
+      POSTGRES_USER: varuna
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-varuna}
+    ports: ["5432:5432"]
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U varuna"]
+      interval: 10s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+    volumes: ["redisdata:/data"]
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-varuna}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-varuna_secret}
+    ports: ["9000:9000", "9001:9001"]
+    volumes: ["miniodata:/data"]
+
+  api:
+    build: .
+    command: uvicorn src.api.main:app --host 0.0.0.0 --port 8000
+    env_file: [.env]
+    ports: ["8000:8000"]
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_started}
+      minio: {condition: service_started}
+    volumes:
+      - "./src:/app/src"
+      - "./data:/app/data"
+      - "./models:/app/models"
+
+  worker:
+    build: .
+    command: celery -A src.api.worker.celery_app worker --loglevel=info --pool=solo
+    env_file: [.env]
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_started}
+    volumes:
+      - "./src:/app/src"
+      - "./data:/app/data"
+      - "./models:/app/models"
+    # Uncomment on the GPU demo node:
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices: [{driver: nvidia, count: 1, capabilities: [gpu]}]
+
+volumes:
+  pgdata:
+  redisdata:
+  miniodata:

@@ -1,0 +1,92 @@
+# ═══════════════════════════════════════════════
+#  VARUNA GRID — .gitignore
+# ═══════════════════════════════════════════════
+
+# ── Python ──
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+*.egg
+dist/
+build/
+eggs/
+*.whl
+pip-log.txt
+pip-delete-this-directory.txt
+
+# ── Virtual Environments ──
+venv/
+env/
+.venv/
+.env
+*.env
+!.env.example
+
+# ── IDE / Editor ──
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+
+# ── OS ──
+.DS_Store
+Thumbs.db
+desktop.ini
+*.lnk
+
+# ── Data (large files — do not commit) ──
+data/cache/
+data/forcing/*.nc
+data/forcing/*.grib
+data/scenes/*.tif
+data/scenes/*.tiff
+data/scenes/*.safe
+data/scenes/*.zip
+data/output/
+*.npz
+*.npy
+
+# ── Models (large binary weights — do not commit) ──
+models/*.pt
+models/*.pth
+models/*.torchscript
+models/*.onnx
+models/*.joblib
+models/*.pkl
+models/*.h5
+
+# ── Experiment results (large CSVs, plots) ──
+experiments/go_nogo/results/
+experiments/go_nogo/__pycache__/
+
+# ── Docker ──
+docker-compose.override.yml
+
+# ── Logs ──
+*.log
+logs/
+
+# ── Jupyter ──
+.ipynb_checkpoints/
+*.ipynb
+
+# ── pytest ──
+.pytest_cache/
+htmlcov/
+.coverage
+.coverage.*
+
+# ── mypy ──
+.mypy_cache/
+
+# ── Misc ──
+*.bak
+*.tmp
+*.temp
+.agents/
