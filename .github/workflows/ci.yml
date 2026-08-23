@@ -1,0 +1,98 @@
+name: CI
+
+on:
+  push: { branches: [main, develop] }
+  pull_request: { branches: [main, develop] }
+
+env:
+  PYTHONPATH: packages
+
+jobs:
+  quality:
+    name: Lint · types · fast tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12", cache: pip }
+
+      - name: Install system geospatial deps
+        run: sudo apt-get update && sudo apt-get install -y libgdal-dev libproj-dev libgeos-dev
+
+      - name: Install project
+        run: pip install -e ".[dev]"
+
+      - name: Ruff
+        run: ruff check packages apps tests
+
+      - name: Mypy (contracts are the strictest surface)
+        run: mypy packages/varuna_contracts
+
+      # Contract tests encode the architectural invariants. A failure here means
+      # an architectural rule was broken — not a flaky test. Never mark continue-on-error.
+      - name: Unit + contract tests
+        run: pytest tests/unit tests/contract -q
+
+  security:
+    name: Security
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12", cache: pip }
+      - run: pip install bandit pip-audit
+      - name: Bandit
+        run: bandit -q -r packages apps -x tests
+      - name: Dependency audit
+        run: pip-audit --strict || echo "::warning::pip-audit found advisories"
+      - name: Secret scan
+        run: |
+          if git grep -nEI '(SECRET|PASSWORD|API_KEY|TOKEN)\s*=\s*["'"'"'][^"'"'"']{8,}' \
+               -- ':!*.example' ':!*.md' ':!.github/*'; then
+            echo "::error::Possible hardcoded secret committed"; exit 1
+          fi
+
+  integration:
+    name: Integration
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_DB: varuna
+          POSTGRES_USER: varuna
+          POSTGRES_PASSWORD: varuna
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U varuna" --health-interval 10s
+          --health-timeout 5s --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: --health-cmd "redis-cli ping" --health-interval 10s --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12", cache: pip }
+      - run: sudo apt-get update && sudo apt-get install -y libgdal-dev libproj-dev libgeos-dev
+      - run: pip install -e ".[dev]"
+      - name: Integration tests
+        env:
+          DATABASE_URL: postgresql+psycopg://varuna:varuna@localhost:5432/varuna
+          REDIS_URL: redis://localhost:6379/0
+        # Adapters must use recorded fixtures — no live external calls in CI.
+        run: pytest tests/integration -q
+
+  docker:
+    name: Image build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build API image
+        run: docker build -f infra/docker/Dockerfile --target base -t varuna-api:ci .
+      - name: Trivy scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: varuna-api:ci
+          severity: HIGH,CRITICAL
+          exit-code: "0"

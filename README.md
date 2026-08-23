@@ -1,414 +1,380 @@
 <p align="center">
-  <img src="https://img.shields.io/badge/SIH_2026-PS_SIH26143-blue?style=for-the-badge" alt="SIH 2026" />
-  <img src="https://img.shields.io/badge/Organisation-NTRO-red?style=for-the-badge" alt="NTRO" />
-  <img src="https://img.shields.io/badge/Theme-Space_Technology-purple?style=for-the-badge" alt="Space Technology" />
-  <img src="https://img.shields.io/badge/Python-3.10+-green?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.10+" />
-  <img src="https://img.shields.io/badge/License-Proprietary-orange?style=for-the-badge" alt="License" />
+  <img src="https://img.shields.io/badge/SIH_2026-PS_SIH26143-1f6f8b?style=for-the-badge" alt="SIH 2026" />
+  <img src="https://img.shields.io/badge/Organisation-NTRO-a8412a?style=for-the-badge" alt="NTRO" />
+  <img src="https://img.shields.io/badge/Python-3.12-2f6b54?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.12" />
+  <img src="https://img.shields.io/badge/Architecture-v2_trust--aware-6a3d7a?style=for-the-badge" alt="v2" />
+  <img src="https://img.shields.io/badge/Status-early_implementation-b58a2e?style=for-the-badge" alt="Status" />
 </p>
 
-<h1 align="center">🌊 VARUNA GRID</h1>
-<h3 align="center">National Marine Pollution Watch & Response Grid</h3>
-<p align="center">
-  <em>Oil Spill Detection · Probabilistic Vessel Attribution · Maritime Enforcement Intelligence</em>
-</p>
+<h1 align="center">VARUNA GRID</h1>
+<h3 align="center">National Marine Pollution Watch &amp; Response Grid</h3>
 
 <p align="center">
-  <strong>Turns a drifting slick into a ranked, calibrated list of suspect vessels — or an evidence-backed statement that the culprit was running dark — and then warns the coast, tasks the aircraft, and builds the case.</strong>
+  <em>Oil spill detection · probabilistic vessel attribution · trust-aware maritime enforcement</em>
 </p>
 
 ---
 
-## 📋 Table of Contents
-
-- [The Problem](#-the-problem)
-- [What VARUNA Does](#-what-varuna-does)
-- [Core Mechanism — RDPA](#-core-mechanism--rdpa)
-- [System Architecture](#-system-architecture)
-- [The Eight Subsystems](#-the-eight-subsystems)
-- [Tech Stack](#-tech-stack)
-- [Project Structure](#-project-structure)
-- [Getting Started](#-getting-started)
-- [Data Sources](#-data-sources)
-- [Evaluation](#-evaluation)
-- [Honesty Rules](#-honesty-rules)
-- [Status](#-status)
-- [Team](#-team)
+> **Status honesty.** The architecture and contracts are implemented and tested (22
+> passing contract tests). **The scientific pipeline is not implemented** — every module
+> is currently a scaffolded package. The one experiment in the repository produces a
+> number that cannot be used. `SETUP_STATUS.md` is the authority; this README describes
+> intent and design.
 
 ---
 
-## 🎯 The Problem
+## Contents
 
-> **PS SIH26143** — *Leveraging satellite imagery to determine oil spills at sea along with AIS data correlations to identify the vessel responsible for the spill.*
->
-> — **National Technical Research Organisation (NTRO)**, SIH 2026
+- [The problem](#the-problem) · [What VARUNA does](#what-varuna-does) · [RDPA](#the-mechanism--rdpa)
+- [Trust-aware architecture](#trust-aware-architecture) · [Modules](#modules) · [Stack](#tech-stack)
+- [Repository](#repository) · [Setup](#setup) · [Tests](#tests) · [Evaluation](#evaluation)
+- [Failure behaviour](#failure-behaviour) · [Real vs simulated](#real-vs-simulated)
+- [Seven-day sprint](#seven-day-sprint) · [Honesty rules](#honesty-rules) · [Status](#current-status) · [Roadmap](#roadmap)
 
-Marine oil spills inflict enormous damage on ecosystems. Chronic operational discharges (illegal bilge dumping) vastly exceed headline tanker accidents in aggregate volume — and are **entirely deliberate**, therefore **deterrable**.
+---
 
-**The core challenge:** Oil is a drifting, deforming record of a crime whose timestamp and location have been erased by the ocean. By the time a satellite passes overhead — hours or days later — the slick has moved, the ship is a hundred nautical miles away, and every deployed tool tries to identify the culprit by looking at where the evidence *ended up* rather than reconstructing where it *began*.
+## The problem
 
-### Why India, Why Now
+> **PS SIH26143** — *Leveraging satellite imagery to determine oil spills at sea along with
+> AIS data correlations to identify the vessel responsible for the spill.* — **NTRO**
+
+A ship opens a valve at night, sixty nautical miles offshore. The bilge discharge damps
+the capillary waves that scatter radar, so it shows up as a dark patch when a satellite
+next passes — hours or days later. By then the slick has drifted and deformed, and the
+ship is a hundred nautical miles away.
+
+**Oil is a drifting, deforming record of a crime whose timestamp and location have been
+erased by the ocean.** Every deployed tool identifies the culprit by looking at where the
+evidence *ended up*, rather than reconstructing where it *began*.
+
+### Why India
 
 | Factor | Detail |
 |---|---|
-| **Geography** | India sits astride the Gulf → Malacca tanker artery. ~7,500 km coastline. Dense traffic through the Gulf of Kutch, Mumbai High, and the Palk Bay approaches. |
-| **Revisit Gap** | Sentinel-1 revisit over the Indian EEZ is a matter of days, not hours. **India's default case is the aged slick** — precisely where geometric matching fails. |
-| **Institutional Gap** | ITOPF's country profile describes **no satellite attribution capability** and no vessel identification mechanisms. |
+| **Geography** | Astride the Gulf → Malacca tanker artery. ~7,500 km coastline. |
+| **Revisit gap** | Sentinel-1 revisit over the Indian EEZ is days, not hours. **India's default case is the aged slick** — precisely where geometric matching fails. |
+| **Institutional gap** | ITOPF's India profile documents no satellite attribution capability. (No *publicly documented* system — not a claim that none exists.) |
 
 ---
 
-## 🔱 What VARUNA Does
+## What VARUNA does
 
-> *"Today, a spill is detected and the file is closed as source unknown. VARUNA closes the loop: it names the ship, warns the coast, launches the aircraft, and builds the case — in the eleven minutes before the duty officer finishes his tea."*
+It inserts the missing inferential step between "a slick exists" and "a human decides",
+and closes a feedback loop that currently does not exist.
 
-VARUNA inserts the **missing inferential step** between "a slick exists" and "a human decides." It does not replace detection, and it does not replace the officer. It provides:
+```
+OBSERVE → TRUST → DETECT → RECONSTRUCT → ATTRIBUTE → FORECAST
+       → PRIORITIZE → ASSIGN → AUTHORIZE → RESPOND → VERIFY → PRESERVE → LEARN
+```
 
-1. **Probabilistic origin reconstruction** — where and when the oil was released
-2. **Calibrated vessel attribution** — ranked suspects with defensible confidence scores
-3. **Dark vessel hypothesis testing** — explicit scoring of non-broadcasting culprits
-4. **Impact forecasting** — where the slick will land, and when
-5. **Response asset tasking** — which aircraft, which search box, which pattern
-6. **Evidence packaging** — a checksummed, prosecutable case file
-7. **Offender intelligence** — repeat-offender graphs and pollution corridor memory
+**Core design principle:**
+
+> No untrusted information should silently become a trusted decision.
+
+**The product is the API**, not the map. Strip the UI and what remains is a service that
+ingests `(SAR scene, timestamp, AIS window)` and returns a calibrated posterior over
+vessels, a serialised origin probability field, and an evidence manifest.
 
 ---
 
-## 🧪 Core Mechanism — RDPA
+## The mechanism — RDPA
 
 **Reverse-Drift Posterior Attribution** with a latent dark-vessel hypothesis.
 
-Instead of asking *"which ship is lying alongside this slick?"*, VARUNA reconstructs **where and when the oil was released** as a probability field, then scores every candidate vessel by how much of that field its trajectory actually explains.
+Instead of *"which ship is lying alongside this slick?"*, reconstruct **where and when the
+oil was released** as a probability field, then score every candidate by how much of that
+field its trajectory actually explains.
 
 ```
-INPUT       Sentinel-1 SAR scene · slick mask · ERA5 wind · CMEMS currents · AIS tracks
-
-STEP 1      SEGMENT slick → contour, area, elongation, AGE PRIOR (a distribution, not a point)
-
-STEP 2      ENSEMBLE REVERSE ADVECTION — N particles × M perturbed forcing realisations
-            → N×M backward trajectories, not one streamline
-
-STEP 3      Build 4-D ORIGIN PROBABILITY FIELD Φ(x, y, t)
-
-STEP 4      PATH-INTEGRAL LIKELIHOOD — for each AIS track k:
-              L_k = ∫ Φ(x_k(t), y_k(t), t) dt
-            weighted by emission prior π_k (vessel type, AIS gaps, behaviour)
-
-STEP 5      LATENT-SOURCE HYPOTHESIS L₀ — residual Φ mass no observed track explains
-            (high residual ⇒ a dark vessel was there)
-
-STEP 6      NORMALISE → calibrated posterior over all candidates + latent source
-            Or: INCONCLUSIVE (flat posterior — a first-class result, not an error)
-
-OUTPUT      Ranked vessels with calibrated probabilities | "latent source dominant" | INCONCLUSIVE
+1  SEGMENT      slick → contour, area, elongation, AGE PRIOR (a distribution)
+2  ADVECT BACK  N particles × M structurally-varied forcing members, negative timestep
+3  ACCUMULATE   origin probability field  Φ(x, y, t)  + convergence/mode/sensitivity diagnostics
+4  PATH INTEGRAL   L_k = ∫ Φ(x_k(t), y_k(t), t) dt   × behavioural prior π_k
+5  LATENT L₀    residual Φ mass no observed track explains
+6  NORMALISE    calibrated posterior over {L₀, π₁L₁ … π_kL_k}
+7  GATE         distinguishability + validity → STRONG_LEAD | WEAK_LEAD
+                | NOT_DISTINGUISHABLE | LATENT_SOURCE | INCONCLUSIVE
 ```
 
-### Why This Formulation
+**Why this formulation:** it is the only one that degrades gracefully with slick age. As
+the origin field widens, probabilities spread and the system *says so*, instead of
+confidently naming the nearest innocent ship.
 
-It is the only one that **degrades gracefully with slick age**: as the origin field widens, probabilities spread and the system says so — instead of confidently naming the nearest innocent ship.
+Two distinctions v1 collapsed and v2 keeps separate:
+
+- **Trust ≠ confidence.** Trust is about the source; confidence is about the measurement.
+- **Peakedness ≠ distinguishability.** Two vessels inside one lobe of Φ can produce a sharp
+  posterior and still be inseparable. That returns `NOT_DISTINGUISHABLE`, not a name.
 
 ---
 
-## 🏗 System Architecture
+## Trust-aware architecture
+
+Three planes. Full detail with sequence and state diagrams in **[`ARCHITECTURE_V2.md`](ARCHITECTURE_V2.md)**.
 
 ```
-PRAHARI(cut) → NETRA → PRATIVARTAN → NYAYA ←── CHHAYA
-                 M2,M3      M5          M7-M10     xView3
-                              ↓           ↓
-                          PRAVAAH      ABHIYAN → PRAMAN → SMRITI
-                            M11        greedy     M13      M12
+GOVERNANCE   Event Spine · PRAMAN · audit · lineage · observability · versioning
+                                    ▲ every step emits
+DATA         External → Source Adapter → Ingestion Gate → DATA GUARD
+             → Flow Inspection → NETRA → PRATIVARTAN → Φ diagnostics
+             → NYAYA ← CHHAYA → ★ VALIDITY GATE ★ → PRAVAAH → Case Intelligence
+             → ABHIYAN → Mission FSM → ★ AUTHORIZATION ★ → HUMAN → Action Gateway
+             → Field Outcome → SMRITI
+                                    ▲ governed by
+CONTROL      source trust · policy · thresholds · RBAC · versions · model registry
 ```
 
-Linear, auditable, no branching. In-process Python calls; REST only for the frontend.
+The two ★ gates are mandatory chokepoints. No path to an operational action bypasses them.
 
-### Operational Loop
+**Bounded Evidence Influence.** Each observation carries `0 ≤ w ≤ 1`, capped by its trust
+state (TRUSTED 1.0 · DEGRADED 0.6 · CONFLICTED 0.3 · QUARANTINED 0.0). The **value is
+never modified** — only its downstream influence is bounded. A legitimately extreme
+observation survives; a compromised source is contained. This is *not* PPO clipping.
 
-```
-[ PRAHARI ]      every Sentinel-1 pass over the EEZ
-     ↓
-[ NETRA ]        oil, or a look-alike?         → confidence, rejected FPs
-     ↓
-[ PRATIVARTAN ]  where did it come FROM?       → Φ(x,y,t) origin field
-     ↓                                       ↘
-[ NYAYA ]        who did it?                    [ CHHAYA ] …or who was hiding?
-     ↓                                       ↙
-[ PRAVAAH ]      where will it LAND, and when? → named coast + countdown
-     ↓
-[ ABHIYAN ]      what do we DO right now?      → asset + search box + ETA
-     ↓
-── HUMAN ──      duty officer approves / overrides / marks inconclusive
-     ↓
-[ SETU ]         ICG station · DG Shipping · State PCB · fishermen SMS
-     ↓
-── REALITY ──    overflight result · oil fingerprint · Oil Record Book audit
-     ↓
-[ PRAMAN ]       case file sealed, versioned, prosecutable
-     ↓
-[ SMRITI ]       outcome recalibrates NYAYA · offender graph grows
-     ↓
-     └──────── the system is now better than it was ────────┘
-```
+**Uncertainty propagates structurally.** `EvidenceEnvelope.derive()` refuses to produce an
+output more trusted, more valid, or less degraded than its worst input.
 
 ---
 
-## 🧩 The Eight Subsystems
+## Modules
 
-| # | Name | Function | Description |
-|---|---|---|---|
-| 01 | **PRAHARI** | Persistent EEZ Watch | Continuously ingests Sentinel-1 passes, tiles, detects, triages. *(Cut for hackathon — pre-ingest scenes)* |
-| 02 | **NETRA** | Slick Detection & Look-alike Rejection | U-Net on VV+VH with ERA5 wind as an extra input channel. Outputs mask, class, confidence. |
-| 03 | **PRATIVARTAN** ★ | Reverse-Drift Origin Engine | OpenDrift ensemble backwards under perturbed forcing → Φ(x,y,t). |
-| 04 | **NYAYA** ★ | Attribution & Dark-Source Hypothesis | Path-integral scoring against Φ, weighted by behavioural priors, competed against the latent hypothesis. |
-| 05 | **CHHAYA** | Dark Vessel Resolver | xView3 pretrained SAR ship detector, cross-referenced with AIS. |
-| 06 | **PRAVAAH** | Impact & Landfall Forecast | Forward drift: projects 24–72h onto the coast. Which beach, which fishing ground, how many hours. |
-| 07 | **ABHIYAN** ★ | Response Asset Tasking | Compute which asset, which search box, what pattern to maximise confirmation probability per hour flown. |
-| 08 | **SMRITI** | Offender Intelligence & Hotspot Memory | Stores every case. Repeat-offender graph, pollution-corridor heatmap, watchlist. |
-
-### Supporting Layers
-
-| Name | Function |
-|---|---|
-| **PRAMAN** | Evidence pack — checksummed MARPOL Annex I case file: scene IDs, model versions, forcing versions, Φ snapshot, chain of custody. |
-| **SETU** | Dissemination — routes alerts to ICG station, DG Shipping, State PCB, and multilingual SMS to fishermen. |
-
----
-
-## ⚙️ Tech Stack
-
-| Layer | Technology |
-|---|---|
-| **Drift Physics** | OpenDrift / OpenOil (GPLv2) |
-| **Machine Learning** | PyTorch + segmentation-models-pytorch |
-| **Geospatial** | rasterio · xarray · GeoPandas · Shapely · pyproj |
-| **SAR Preprocessing** | ESA SNAP / pyroSAR |
-| **Backend** | FastAPI + Celery + Redis |
-| **Database** | PostgreSQL + PostGIS |
-| **Object Storage** | MinIO (S3-compatible) |
-| **Frontend** | React + MapLibre GL + deck.gl |
-| **Model Export** | TorchScript / ONNX Runtime |
-| **Infrastructure** | Docker Compose |
-| **Data Config** | Pydantic v2 + structlog |
-
----
-
-## 📁 Project Structure
-
-```
-VARUNA/
-├── README.md                       # ← You are here
-├── VARUNA_MASTER_CONTEXT.md        # Complete project context & strategy document
-├── CLAUDE.md                       # Quick reference for development sessions
-├── requirements.txt                # Python dependencies
-├── docker-compose.yml              # Full infrastructure stack
-├── .env.example                    # Environment configuration template
-├── .gitignore                      # Git ignore rules
-│
-├── src/                            # Source code
-│   ├── common/                     # Shared contracts & utilities
-│   │   ├── schemas.py              # THE contract — all subsystem data types
-│   │   ├── config.py               # Centralised configuration
-│   │   ├── geo_utils.py            # Geospatial helpers
-│   │   └── logging.py              # Structured logging setup
-│   │
-│   ├── netra/                      # M2/M3: Slick detection & characterisation
-│   ├── prativartan/                # M5: Reverse-drift origin engine (Φ field)
-│   ├── nyaya/                      # M7-M10: Attribution & dark-source hypothesis
-│   ├── chhaya/                     # M9b: Dark vessel resolver (xView3)
-│   ├── pravaah/                    # M11: Forward drift & landfall forecast
-│   ├── ais/                        # M6: AIS ingest & track builder
-│   ├── abhiyan/                    # Response asset tasking
-│   ├── smriti/                     # Offender intelligence & memory
-│   ├── praman/                     # Evidence manifest & case files
-│   ├── eval/                       # Simulation harness & evaluation
-│   └── api/                        # FastAPI application & routes
-│       └── routes/
-│
-├── experiments/                    # Experimental validation
-│   └── go_nogo/                    # Week-1 discriminability harness
-│       ├── core.py
-│       ├── run.py
-│       ├── sweep.py
-│       └── visualize.py
-│
-├── data/                           # Data directory (gitignored)
-│   ├── cache/
-│   ├── forcing/                    # CMEMS currents, ERA5 wind (NetCDF)
-│   └── scenes/                     # SAR imagery
-│
-├── models/                         # Trained model weights (gitignored)
-│
-├── tasks/                          # Per-person work assignments
-│   ├── P1_ARCHITECT.md
-│   ├── P2_ML_VISION.md
-│   ├── P3_PHYSICS.md
-│   ├── P4_BACKEND.md
-│   ├── P5_FRONTEND.md
-│   └── P6_PRODUCT.md
-│
-└── docs/                           # Design documentation
-    └── DECISIONS.md                # Architecture decision records
-```
-
----
-
-## 🚀 Getting Started
-
-### Prerequisites
-
-- Python 3.10+
-- Docker & Docker Compose
-- Conda (recommended for OpenDrift)
-
-### 1. Clone the Repository
-
-```bash
-git clone https://github.com/Soumya080/VARUNA.git
-cd VARUNA
-```
-
-### 2. Environment Setup
-
-```bash
-# Copy and configure environment variables
-cp .env.example .env
-# Edit .env with your credentials (Copernicus, CDS API, etc.)
-```
-
-### 3. Install Dependencies
-
-```bash
-# Create a virtual environment
-python -m venv venv
-source venv/bin/activate  # Linux/Mac
-# or
-venv\Scripts\activate     # Windows
-
-# Install Python dependencies
-pip install -r requirements.txt
-
-# OpenDrift may require conda:
-# conda install -c opendrift -c conda-forge opendrift
-```
-
-### 4. Start Infrastructure
-
-```bash
-# Launch PostgreSQL+PostGIS, Redis, MinIO
-docker-compose up -d postgres redis minio
-```
-
-### 5. Run the API
-
-```bash
-# Development server
-uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --reload
-
-# Or via Docker Compose (full stack)
-docker-compose up
-```
-
----
-
-## 📊 Data Sources
-
-| Source | Type | Access |
+| Module | Role | Status |
 |---|---|---|
-| [Zenodo Sentinel-1 Oil Spill Dataset](https://zenodo.org/records/8346860) | SAR imagery + masks (1,200 images) | Open — CC-BY-4.0 |
-| [Eastern Mediterranean Slicks + Look-alikes (ESSD 2025)](https://essd.copernicus.org/articles/17/6807/2025/) | 3,225 oil + 2,290 look-alike patches | Open — CC-BY-4.0 |
-| [MarineCadastre AIS](https://marinecadastre.gov/accessais/) | Vessel traffic (US waters) | Open |
-| [Sentinel-1 GRD](https://dataspace.copernicus.eu/) | Raw SAR scenes (global) | Free registration |
-| [CMEMS Ocean Currents](https://data.marine.copernicus.eu/) | Surface current fields | Free registration |
-| [ERA5 Wind](https://cds.climate.copernicus.eu/) | 10m wind components | Free registration |
-| [xView3-SAR](https://github.com/allenai/sar_vessel_detect) | Dark vessel detection model | Open |
+| **PRAHARI** | Persistent EEZ watch — scheduler, scene discovery, triage | SCAFFOLDED |
+| **Data Guard** | Trust boundary — schema, units, CRS, freshness, cross-source, manipulation | SCAFFOLDED |
+| **NETRA** | Slick detection + look-alike rejection + age **distribution** | SCAFFOLDED |
+| **PRATIVARTAN** | Reverse-advection ensemble → Φ with first-class diagnostics | SCAFFOLDED |
+| **NYAYA** | Path-integral scoring, priors, latent hypothesis, calibrated posterior | SCAFFOLDED |
+| **CHHAYA** | Dark-vessel investigation (xView3). Distinguishes *no visible source* from *weak visible sources* | SCAFFOLDED |
+| **PRAVAAH** | Forward drift → landfall **interval**, exposure | SCAFFOLDED |
+| **ABHIYAN** | Feasibility filter → value matrix → exact assignment → explanation | SCAFFOLDED |
+| **Missions** | Mission FSM + authorization gate | **VERIFIED** (contracts) |
+| **Alerts** | Materiality → role router → policy → freshness → channel | SCAFFOLDED |
+| **PRAMAN** | Evidence preservation, deterministic manifests, hashing | SCAFFOLDED |
+| **SMRITI** | History, recurrence, corridors, **human-gated** retraining pipeline | SCAFFOLDED |
 
 ---
 
-## 📈 Evaluation
+## Tech stack
 
-### North-Star KPI
+**Backend** Python 3.12 · FastAPI · Pydantic v2 · SQLAlchemy 2 · Alembic · httpx · Celery · Redis
+**ML** PyTorch · TorchGeo · segmentation-models-pytorch · scikit-learn · XGBoost · MLflow
+**Geospatial** GDAL · rasterio · rioxarray · xarray · GeoPandas · Shapely · PyProj
+**SAR** ESA SNAP · pyroSAR **Physics** OpenDrift / OpenOil
+**Data** PostgreSQL + PostGIS · MinIO
+**Frontend** React · TypeScript · Vite · MapLibre GL · deck.gl · TanStack Query · Zustand · Tailwind · SSE
+**Ops** Docker Compose · Nginx · OpenTelemetry · Prometheus · Grafana · Loki
+**Security** JWT · RBAC · Argon2 · Bandit · pip-audit · Trivy
+**Testing** pytest · Hypothesis · contract / integration / scientific / robustness / e2e
 
-> **Top-1 attribution accuracy at 24-hour slick age with ≥20 vessels in the envelope, subject to ECE < 0.05.**
+Deliberately absent: Kafka, Kubernetes, service mesh, vector DB, RAG, agent framework, RL
+in the core. Each requires an ADR to reintroduce.
 
-### Evaluation Axes
+---
 
-| Axis | What It Measures |
+## Repository
+
+```
+packages/varuna_contracts/     ★ THE locked contract — import from here, never redefine
+packages/varuna_{domain,data_guard,source_adapters,geospatial}/
+packages/varuna_{netra,prativartan,nyaya,chhaya,pravaah,abhiyan}/
+packages/varuna_{missions,alerts,praman,smriti}/
+apps/{api,worker,web}/
+tests/{unit,contract,integration,scientific,robustness,e2e}/
+experiments/{go_nogo,convergence,forcing_bias,baselines,...}/
+infra/{docker,nginx,monitoring,scripts}/   db/migrations/   docs/{architecture,adr,runbooks}/
+tasks/ROLE_01..04                          models/  data/{raw,bronze,silver,gold}/
+```
+
+**Key documents**
+
+| File | Purpose |
 |---|---|
-| **Attribution vs. Slick Age** | Top-1/Top-3 accuracy at 2, 6, 12, 24, 48h |
-| **Attribution vs. Traffic Density** | Accuracy at 5, 20, 50, 100+ vessels |
-| **Calibration** | Expected Calibration Error (ECE) + reliability diagrams |
-| **Latent-Source Detection** | Precision/recall on "was this a dark vessel?" |
-| **Perception** | IoU/F1 on segmentation; FP rate on look-alike set |
-| **Ablations** | ensemble vs. single trajectory · path-integral vs. nearest-point · ± emission prior · ± latent term |
-
-### Baselines
-
-1. Nearest vessel to slick (naïve)
-2. Cerulean-style geometric matching (parity / proximity / temporality)
-3. Single deterministic backtrack (Seatrack-style)
+| [`SETUP_STATUS.md`](SETUP_STATUS.md) | **Authority on what is implemented** |
+| [`LLM_IMPLEMENTATION_GUIDE.md`](LLM_IMPLEMENTATION_GUIDE.md) | Universal context packet for any coding LLM |
+| [`ARCHITECTURE_V2.md`](ARCHITECTURE_V2.md) | Full architecture, diagrams, trust boundaries |
+| [`FAILURE_THREAT_MATRIX.md`](FAILURE_THREAT_MATRIX.md) | 47 threats → containment → degraded behaviour → test |
+| [`BUILD_PLAN_7_DAYS.md`](BUILD_PLAN_7_DAYS.md) | Day-by-day, four roles, acceptance criteria |
+| [`ML_TRAINING_GUIDE.md`](ML_TRAINING_GUIDE.md) · [`COMPUTE_SPEC.md`](COMPUTE_SPEC.md) | Training manual · hardware plan |
+| [`tasks/ROLE_0N_*.md`](tasks/) | Self-contained per-person context |
 
 ---
 
-## ⚖️ Honesty Rules
+## Setup
 
-These are **non-negotiable**. They come from [Section 18 of the master context](VARUNA_MASTER_CONTEXT.md):
+**Prerequisites:** Python 3.12, Docker + Compose, conda (for OpenDrift).
 
-- ❌ Attribution is **not** unsolved — Cerulean and CleanSeaNet ship it
-- ❌ Backward drift is **not** our innovation — the PS asks for it; Seatrack has done it for 20 years
-- ✅ **Ours is the probabilistic formulation:** ensemble uncertainty, path integral, latent term, calibration
-- ⚠️ Simulated evaluation ≠ operational validation
-- ⚠️ Indian AIS is synthetic — **say so on the slide**
-- ❌ Never "patentable", never "real-time", never "no Indian system exists"
-- ✅ The system **never** names a ship without human sign-off
-- ✅ `INCONCLUSIVE` is a valid, first-class output
+```bash
+git clone <repo> && cd varuna-grid
+cp .env.example .env          # fill in Copernicus / CDS credentials
+
+pip install -e ".[dev]"       # core + dev tooling
+pip install -e ".[ml]"        # optional: torch, smp, mlflow
+conda install -c opendrift -c conda-forge opendrift   # physics
+
+make up-infra                 # postgres + redis + minio
+make migrate
+make test                     # → 22 passed
+```
+
+Run the API locally against the infra stack:
+
+```bash
+uvicorn apps.api.main:app --reload --port 8000
+```
+
+Full stack in Docker: `make up`. Frontend: `docker compose --profile web up`.
+
+> **Note:** `apps/api` is scaffolded — the server does not serve routes yet. `make test`
+> works today.
 
 ---
 
-## 📌 Status
+## Tests
 
-> **23 August 2026** — Design complete. Bootstrap complete (schemas, config, skeleton, task files). No subsystem code yet.
+```bash
+make test              # unit + contract — fast, no services
+make test-integration  # needs make up-infra
+make test-scientific   # seeded numerical regression
+make test-robustness   # failure injection per the threat matrix
+make test-e2e          # full pipeline on CASE-0001
+make check             # lint + typecheck + fast tests (what CI runs)
+```
 
-- **Go/no-go experiment:** NOT YET ESTABLISHED. Initial harness returned 100% top-1, but the harness cannot fail (see [`docs/DECISIONS.md`](docs/DECISIONS.md) §1 for a full defect list). Fair rebuild shows ~12% top-1 — above chance (5%), indicating signal exists. Harness is being rebuilt properly.
-- **Architecture:** Locked. Eight subsystems, linear pipeline, in-process calls.
-- **Schemas:** Complete. All cross-subsystem data contracts defined in [`src/common/schemas.py`](src/common/schemas.py).
-- **Task files:** All six team member assignments ready in [`tasks/`](tasks/).
+Contract tests encode the architectural invariants. **A contract-test failure means an
+architectural rule was broken, not that a test is flaky.**
 
 ---
 
-## 👥 Team
+## Evaluation
 
-Six-person team for SIH 2026. Work is organised across six parallel tracks with zero cross-dependency until day 4:
+**North-star KPI:** top-1 attribution accuracy at 24-hour slick age with ≥20 vessels in
+the envelope, subject to ECE < 0.05.
 
-| Track | Scope | Details |
+| Axis | Measures |
+|---|---|
+| Accuracy vs slick age | 2 / 6 / 12 / 24 / 48 h |
+| Accuracy vs traffic density | 5 / 20 / 50 / 100+ vessels |
+| **Calibration** | ECE + reliability diagram — the number no competing team will report |
+| Latent-source detection | P/R with the guilty track deleted; false-latent rate when present |
+| Perception | IoU/F1 on Zenodo; **look-alike FP rate reported separately** |
+| Ablations | ensemble vs single · path-integral vs nearest-point · ±prior · ±latent · ±wind channel |
+
+**Baselines:** nearest vessel · Cerulean-style geometric (parity/proximity/temporality) ·
+single deterministic backtrack.
+
+> ⚠️ **The current go/no-go harness is invalid.** It reports 100% top-1, but it cannot
+> fail — innocent vessels sit a median 33 km from the origin, the guilty track ends before
+> the observation so the baseline can never win, and L₀ is a constant. Rebuilt fairly:
+> ~12% (chance = 5%). No number leaves `experiments/` until the validity checklist in
+> [`FAILURE_THREAT_MATRIX.md`](FAILURE_THREAT_MATRIX.md) §8 passes.
+
+---
+
+## Failure behaviour
+
+Full matrix in [`FAILURE_THREAT_MATRIX.md`](FAILURE_THREAT_MATRIX.md) — 27 P0 and 20 P1
+threats, each with a containment location and a required test.
+
+| Failure | System behaviour |
+|---|---|
+| Forcing outage | Cache → snapshot → climatology; `FALLBACK_SOURCE`, trust DEGRADED, uncertainty widened, banner shown |
+| Schema/unit/CRS drift | Batch quarantined, raw retained, case blocked — **never silently coerced** |
+| Correlated source bias | Combined influence reduced; ensemble spread widened |
+| AIS spoofing | Kinematic implausibility → track down-weighted; latent hypothesis absorbs residual |
+| Ensemble non-convergence | `NOT_CONVERGED` → validity RESTRICTED → no vessel named |
+| Multimodal Φ | Both lobes drawn and labelled competing origins |
+| Flat posterior | `INCONCLUSIVE` — still emits a narrowed search box |
+| Two vessels in one lobe | `NOT_DISTINGUISHABLE` — both listed, neither named |
+| Weak evidence + dispatch attempt | Blocked by validity gate **and** case invariants |
+| Any assignment | Blocked without `human_approved_by` |
+
+**INCONCLUSIVE is a first-class result.** An enforcement tool that always names someone is
+worse than useless.
+
+---
+
+## Real vs simulated
+
+| REAL | INTEGRATION-READY | SIMULATED |
 |---|---|---|
-| **P1 — Architect** | Go/no-go rebuild, NYAYA, eval harness | [`tasks/P1_ARCHITECT.md`](tasks/P1_ARCHITECT.md) |
-| **P2 — ML/Vision** | NETRA training (GPU), CHHAYA setup | [`tasks/P2_ML_VISION.md`](tasks/P2_ML_VISION.md) |
-| **P3 — Physics** | OpenDrift engine, forcing cache | [`tasks/P3_PHYSICS.md`](tasks/P3_PHYSICS.md) |
-| **P4 — Backend** | API, AIS, PostGIS, SMRITI | [`tasks/P4_BACKEND.md`](tasks/P4_BACKEND.md) |
-| **P5 — Frontend** | Console on mock Φ | [`tasks/P5_FRONTEND.md`](tasks/P5_FRONTEND.md) |
-| **P6 — Product** | Demo cases, slides, video, rehearsal | [`tasks/P6_PRODUCT.md`](tasks/P6_PRODUCT.md) |
+| Scientific core, SAR processing | Indian operational AIS | Indian EEZ AIS traffic |
+| Benchmark datasets (Zenodo, ESSD, xView3) | Government command systems | Government responses |
+| Model inference, PostGIS, MinIO | SACHET / CAP alerting | WhatsApp / SMS delivery |
+| Assignment logic, Event Spine, PRAMAN | WhatsApp / SMS providers | Live field telemetry |
+| Docker deployment, monitoring | National watch expansion | National deployment |
+
+Every simulated provider carries `is_simulated=True` and renders a **SIMULATED** badge.
+Presenting one as live is a P0 honesty violation.
 
 ---
 
-## 🔗 Key Interfaces
+## Seven-day sprint
 
-| Interface | Flow | Description |
-|---|---|---|
-| `SlickDetection` | NETRA → PRATIVARTAN | Carries an age **distribution**, not a point estimate |
-| `PhiFieldMeta` + `.npz` | PRATIVARTAN → NYAYA/frontend | 3-D histogram (n_t, n_y, n_x), normalised to sum=1 |
-| `VesselTrack` | AIS → NYAYA | `transponder_active=False` drives judge control |
-| `AttributionResult` | NYAYA → everything | Posteriors sum to 1 **with** `latent_source` |
+| Day | Focus |
+|---|---|
+| 1 | Foundation — contracts, Docker, CI, PostGIS, mock Φ, frontend scaffold |
+| 2 | PRATIVARTAN + Φ + AIS ingest + Data Guard |
+| 3 | NYAYA + posterior + calibration + baselines |
+| 4 | NETRA + CHHAYA + validity gate + ABHIYAN |
+| 5 | PRAVAAH + missions + alerts + PRAMAN |
+| 6 | PRAHARI + adapters + SMRITI + retraining pipeline |
+| 7 | **Integration, failure testing, deployment, rehearsal — no new features** |
+
+Four roles: [Scientific/ML](tasks/ROLE_01_SCIENTIFIC_ML.md) ·
+[Data/Backend](tasks/ROLE_02_DATA_BACKEND.md) ·
+[Frontend/Geo](tasks/ROLE_03_FRONTEND_GEO.md) ·
+[MLOps/Ops](tasks/ROLE_04_MLOPS_OPS.md)
 
 ---
 
-## 📄 Conventions
+## Honesty rules
 
-- **Python 3.10+**, full type hints, Pydantic v2, structlog
-- **UTC tz-aware** datetimes only — never naive
-- **WGS84** (lon, lat) ordering
-- **km / km² / knots** for all measurements
-- **Absolute imports** from `src.`
-- Model + forcing versions recorded on every artefact
+Non-negotiable. Enforced in review and in [`LLM_IMPLEMENTATION_GUIDE.md`](LLM_IMPLEMENTATION_GUIDE.md) §12.
+
+- Attribution is **not** unsolved — Cerulean and CleanSeaNet ship it in production.
+- Backward drift tracing is **not** our innovation — the PS asks for it; HELCOM Seatrack
+  has done it for ~20 years.
+- **Ours is the probabilistic formulation:** ensemble uncertainty, origin probability
+  field, path-integral scoring, latent-source hypothesis, calibration, distinguishability,
+  and trust-aware operational decisioning.
+- Simulated evaluation ≠ operational validation.
+- Indian AIS is synthetic — say so on the slide.
+- Never "patentable" (only *potentially patent-relevant*). Never "real-time" (Sentinel-1
+  revisit is days — that constraint is *why* backward inference exists). Never "no Indian
+  system exists" as fact (say *no publicly documented system*).
+- The system never names a ship without human sign-off. It produces ranked, calibrated
+  leads for an overflight — not verdicts.
+
+---
+
+## Current status
+
+**24 Aug 2026** — see [`SETUP_STATUS.md`](SETUP_STATUS.md) for the verified breakdown.
+
+- ✅ **Contracts VERIFIED** — Evidence Envelope, trust vocabulary, 4-axis case state,
+  mission FSM, structured Φ, validity gate. **22 contract tests passing.**
+- ✅ Architecture locked; failure matrix written (47 threats).
+- ⚠️ **Go/no-go NOT ESTABLISHED** — existing harness invalid; rebuild is ROLE 01 days 1–3.
+- ❌ **Scientific pipeline not implemented** — all modules scaffolded.
+- ❌ Stack never started; Docker images never built; OpenDrift not installed.
+- ❌ P0 threat coverage: 4 of 27 tested.
+
+---
+
+## Roadmap
+
+**Now (7 days)** — implement the pipeline end to end on CASE-0001 with the gates enforced,
+rebuild the go/no-go honestly, publish calibration.
+
+**Next** — real forcing at scale, PRAHARI over a wider region, multi-product ensembles,
+richer behavioural priors, aerial-verification feedback into calibration.
+
+**Later** — operational AIS integration where permitted, CAP-compatible dissemination,
+native field client, sensor-tasking cues from the latent hypothesis.
 
 ---
 
 <p align="center">
-  <em>Named for the Vedic god of the ocean and of ṛta (cosmic law) — the deity who binds those who break it.</em>
+  <em>Named for the Vedic god of the ocean and of ṛta — cosmic law — the deity who binds those who break it.</em>
 </p>

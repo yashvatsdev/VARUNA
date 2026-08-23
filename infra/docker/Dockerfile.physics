@@ -1,0 +1,27 @@
+# VARUNA GRID v2 — PRATIVARTAN / PRAVAAH physics worker.
+# OpenDrift is distributed through conda-forge; pip resolution is unreliable.
+
+FROM mambaorg/micromamba:1.5-jammy
+
+USER root
+RUN apt-get update && apt-get install -y --no-install-recommends curl libpq-dev \
+ && rm -rf /var/lib/apt/lists/*
+USER $MAMBA_USER
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app/packages:/app
+
+RUN micromamba install -y -n base -c conda-forge -c opendrift \
+      python=3.12 opendrift gdal proj geos \
+ && micromamba clean --all --yes
+
+WORKDIR /app
+COPY --chown=$MAMBA_USER:$MAMBA_USER pyproject.toml README.md ./
+COPY --chown=$MAMBA_USER:$MAMBA_USER packages/ ./packages/
+COPY --chown=$MAMBA_USER:$MAMBA_USER apps/ ./apps/
+
+ARG MAMBA_DOCKERFILE_ACTIVATE=1
+RUN pip install -e .
+
+CMD ["celery", "-A", "apps.worker.celery_app:celery_app", "worker", \
+     "--loglevel=info", "--queues=physics", "--concurrency=2"]

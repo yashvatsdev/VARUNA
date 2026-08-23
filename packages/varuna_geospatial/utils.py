@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from src.common.schemas import BBox, GeoPoint
+from varuna_contracts.schemas import BBox, GeoPoint
 
 EARTH_RADIUS_KM = 6371.0088
 DEG_LAT_KM = 111.32

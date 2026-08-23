@@ -1,3 +1,8 @@
+# VARUNA GRID v2 — development stack.
+#   make up          start infrastructure + api + workers
+#   make up-infra    postgres/redis/minio only (for local uvicorn)
+# Production overrides: docker-compose.prod.yml
+
 services:
   postgres:
     image: postgis/postgis:16-3.4
@@ -8,14 +13,20 @@ services:
     ports: ["5432:5432"]
     volumes: ["pgdata:/var/lib/postgresql/data"]
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U varuna"]
+      test: ["CMD-SHELL", "pg_isready -U varuna -d varuna"]
       interval: 10s
+      timeout: 5s
       retries: 5
 
   redis:
     image: redis:7-alpine
+    command: redis-server --appendonly yes
     ports: ["6379:6379"]
     volumes: ["redisdata:/data"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      retries: 5
 
   minio:
     image: minio/minio:latest
@@ -25,39 +36,88 @@ services:
       MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-varuna_secret}
     ports: ["9000:9000", "9001:9001"]
     volumes: ["miniodata:/data"]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      retries: 5
 
   api:
-    build: .
-    command: uvicorn src.api.main:app --host 0.0.0.0 --port 8000
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile
+      target: base
+    command: uvicorn apps.api.main:app --host 0.0.0.0 --port 8000 --reload
     env_file: [.env]
+    environment:
+      DATABASE_URL: postgresql+psycopg://varuna:${POSTGRES_PASSWORD:-varuna}@postgres:5432/varuna
+      REDIS_URL: redis://redis:6379/0
+      MINIO_ENDPOINT: minio:9000
     ports: ["8000:8000"]
     depends_on:
       postgres: {condition: service_healthy}
-      redis: {condition: service_started}
-      minio: {condition: service_started}
+      redis: {condition: service_healthy}
+      minio: {condition: service_healthy}
     volumes:
-      - "./src:/app/src"
+      - "./packages:/app/packages"
+      - "./apps:/app/apps"
       - "./data:/app/data"
       - "./models:/app/models"
 
   worker:
-    build: .
-    command: celery -A src.api.worker.celery_app worker --loglevel=info --pool=solo
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile
+      target: base
+    command: celery -A apps.worker.celery_app:celery_app worker --loglevel=info --queues=default --pool=solo
     env_file: [.env]
+    environment:
+      DATABASE_URL: postgresql+psycopg://varuna:${POSTGRES_PASSWORD:-varuna}@postgres:5432/varuna
+      REDIS_URL: redis://redis:6379/0
+      MINIO_ENDPOINT: minio:9000
     depends_on:
       postgres: {condition: service_healthy}
-      redis: {condition: service_started}
+      redis: {condition: service_healthy}
     volumes:
-      - "./src:/app/src"
+      - "./packages:/app/packages"
+      - "./apps:/app/apps"
       - "./data:/app/data"
       - "./models:/app/models"
-    # Uncomment on the GPU demo node:
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices: [{driver: nvidia, count: 1, capabilities: [gpu]}]
+
+  # Physics worker — separate image, OpenDrift via conda. Start with:
+  #   docker compose --profile physics up -d
+  worker-physics:
+    profiles: ["physics"]
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.physics
+    env_file: [.env]
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      MINIO_ENDPOINT: minio:9000
+    depends_on:
+      redis: {condition: service_healthy}
+    volumes:
+      - "./packages:/app/packages"
+      - "./apps:/app/apps"
+      - "./data:/app/data"
+
+  web:
+    profiles: ["web"]
+    image: node:20-alpine
+    working_dir: /app
+    command: sh -c "npm ci && npm run dev -- --host 0.0.0.0"
+    ports: ["5173:5173"]
+    volumes: ["./apps/web:/app"]
+
+  mlflow:
+    profiles: ["mlops"]
+    image: ghcr.io/mlflow/mlflow:v2.12.1
+    command: mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri sqlite:////mlflow/mlflow.db --default-artifact-root /mlflow/artifacts
+    ports: ["5000:5000"]
+    volumes: ["mlflowdata:/mlflow"]
 
 volumes:
   pgdata:
   redisdata:
   miniodata:
+  mlflowdata:
