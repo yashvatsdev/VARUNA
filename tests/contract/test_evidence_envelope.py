@@ -6,13 +6,14 @@ Fix the caller, or write an ADR. Do not relax these assertions.
 """
 
 import pytest
-from hypothesis import given, strategies as st
+from hypothesis import given
+from hypothesis import strategies as st
 
 from varuna_contracts import (
     CaseLifecycle,
     CaseStateVector,
-    EvidenceState,
     EvidenceEnvelope,
+    EvidenceState,
     InvestigationState,
     MissionRecord,
     MissionState,

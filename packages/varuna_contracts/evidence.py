@@ -23,21 +23,29 @@ from __future__ import annotations
 
 import hashlib
 import json
-from datetime import datetime, timezone
-from enum import Enum
-from typing import Any, Optional, Sequence
+from collections.abc import Sequence
+from datetime import UTC, datetime
+from enum import StrEnum
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 __all__ = [
-    "TrustState", "ValidityState", "DegradationState", "CalibrationState",
-    "AnomalyFlag", "Provenance", "QualityMetrics", "UncertaintyBlock",
-    "EvidenceEnvelope", "EnvelopedArtifact",
+    "AnomalyFlag",
+    "CalibrationState",
+    "DegradationState",
+    "EnvelopedArtifact",
+    "EvidenceEnvelope",
+    "Provenance",
+    "QualityMetrics",
+    "TrustState",
+    "UncertaintyBlock",
+    "ValidityState",
 ]
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class _Base(BaseModel):
@@ -46,7 +54,7 @@ class _Base(BaseModel):
 
 # ───────────────────────── Trust / validity vocabulary ─────────────────────────
 
-class TrustState(str, Enum):
+class TrustState(StrEnum):
     """Data Guard verdict on the SOURCE. Not about measurement quality."""
     TRUSTED = "trusted"
     DEGRADED = "degraded"        # usable, reduced influence, must be surfaced
@@ -68,7 +76,7 @@ class TrustState(str, Enum):
         return {"trusted": 0, "degraded": 1, "conflicted": 2, "quarantined": 3}[self.value]
 
 
-class ValidityState(str, Enum):
+class ValidityState(StrEnum):
     """Validity/Uncertainty Gate verdict. Gates operational action."""
     VALID = "valid"
     DEGRADED = "degraded"          # actionable with caveats shown to the officer
@@ -84,7 +92,7 @@ class ValidityState(str, Enum):
         return self in (ValidityState.VALID, ValidityState.DEGRADED)
 
 
-class DegradationState(str, Enum):
+class DegradationState(StrEnum):
     NOMINAL = "nominal"
     PARTIAL_INPUT_LOSS = "partial_input_loss"
     FALLBACK_SOURCE = "fallback_source"       # e.g. climatology instead of forecast
@@ -99,14 +107,14 @@ class DegradationState(str, Enum):
         return order.index(self.value)
 
 
-class CalibrationState(str, Enum):
+class CalibrationState(StrEnum):
     CALIBRATED = "calibrated"
     UNCALIBRATED = "uncalibrated"
     OUT_OF_DOMAIN = "out_of_domain"   # inputs outside the calibration fit domain
     NOT_APPLICABLE = "not_applicable"
 
 
-class AnomalyFlag(str, Enum):
+class AnomalyFlag(StrEnum):
     """Emitted by Data Guard (source-level) and Flow Inspection (propagation-level)."""
     SCHEMA_MISMATCH = "schema_mismatch"
     UNIT_MISMATCH = "unit_mismatch"
@@ -137,23 +145,23 @@ class AnomalyFlag(str, Enum):
 class Provenance(_Base):
     """Immutable lineage. Points at RAW artifacts that are never overwritten."""
     source_id: str                                   # "cmems.glorys12v1", "netra"
-    source_version: Optional[str] = None             # product/dataset version string
+    source_version: str | None = None             # product/dataset version string
     raw_artifact_refs: list[str] = Field(default_factory=list)  # MinIO keys, never mutated
-    retrieved_at: Optional[datetime] = None
-    adapter_id: Optional[str] = None                 # which source adapter fetched it
-    license: Optional[str] = None
-    citation: Optional[str] = None
-    notes: Optional[str] = None
+    retrieved_at: datetime | None = None
+    adapter_id: str | None = None                 # which source adapter fetched it
+    license: str | None = None
+    citation: str | None = None
+    notes: str | None = None
 
 
 class QualityMetrics(_Base):
     """Measurement quality. Distinct from source trust."""
-    completeness: Optional[float] = Field(None, ge=0, le=1)
-    freshness_seconds: Optional[float] = Field(None, ge=0)
-    spatial_coverage: Optional[float] = Field(None, ge=0, le=1)
-    resolution_m: Optional[float] = Field(None, gt=0)
-    ood_score: Optional[float] = Field(None, ge=0, le=1)   # 1 = far out of distribution
-    model_confidence: Optional[float] = Field(None, ge=0, le=1)
+    completeness: float | None = Field(None, ge=0, le=1)
+    freshness_seconds: float | None = Field(None, ge=0)
+    spatial_coverage: float | None = Field(None, ge=0, le=1)
+    resolution_m: float | None = Field(None, gt=0)
+    ood_score: float | None = Field(None, ge=0, le=1)   # 1 = far out of distribution
+    model_confidence: float | None = Field(None, ge=0, le=1)
     extra: dict[str, float] = Field(default_factory=dict)
 
 
@@ -163,17 +171,17 @@ class UncertaintyBlock(_Base):
     in any scientific subsystem.
     """
     representation: str = "none"     # "none"|"gaussian"|"lognormal"|"samples"|"field"|"interval"
-    mean: Optional[float] = None
-    std: Optional[float] = Field(None, ge=0)
-    lower: Optional[float] = None
-    upper: Optional[float] = None
-    interval_confidence: Optional[float] = Field(None, gt=0, lt=1)
-    entropy: Optional[float] = Field(None, ge=0)
-    n_samples: Optional[int] = Field(None, gt=0)
+    mean: float | None = None
+    std: float | None = Field(None, ge=0)
+    lower: float | None = None
+    upper: float | None = None
+    interval_confidence: float | None = Field(None, gt=0, lt=1)
+    entropy: float | None = Field(None, ge=0)
+    n_samples: int | None = Field(None, gt=0)
     sensitivity: dict[str, float] = Field(default_factory=dict)  # d(output)/d(assumption)
 
     @model_validator(mode="after")
-    def _interval_ordered(self) -> "UncertaintyBlock":
+    def _interval_ordered(self) -> UncertaintyBlock:
         if self.lower is not None and self.upper is not None and self.lower > self.upper:
             raise ValueError("lower must be <= upper")
         return self
@@ -190,11 +198,11 @@ class EvidenceEnvelope(_Base):
     TRUSTED output.
     """
     artifact_id: str
-    case_id: Optional[str] = None
+    case_id: str | None = None
     parent_artifact_ids: list[str] = Field(default_factory=list)
 
     produced_by: str                                  # "netra" | "prativartan" | ...
-    model_version: Optional[str] = None
+    model_version: str | None = None
     processing_version: str = "0.1.0"
     created_at: datetime = Field(default_factory=_utcnow)
 
@@ -211,10 +219,10 @@ class EvidenceEnvelope(_Base):
     degradation_state: DegradationState = DegradationState.NOMINAL
     anomaly_flags: list[AnomalyFlag] = Field(default_factory=list)
 
-    content_hash: Optional[str] = None                # sha256 of the payload bytes
+    content_hash: str | None = None                # sha256 of the payload bytes
 
     @model_validator(mode="after")
-    def _influence_within_trust_ceiling(self) -> "EvidenceEnvelope":
+    def _influence_within_trust_ceiling(self) -> EvidenceEnvelope:
         ceiling = self.trust.max_influence
         if self.influence_weight > ceiling + 1e-9:
             raise ValueError(
@@ -230,16 +238,16 @@ class EvidenceEnvelope(_Base):
         *,
         artifact_id: str,
         produced_by: str,
-        also_from: Sequence["EvidenceEnvelope"] = (),
-        model_version: Optional[str] = None,
+        also_from: Sequence[EvidenceEnvelope] = (),
+        model_version: str | None = None,
         processing_version: str = "0.1.0",
-        quality: Optional[QualityMetrics] = None,
-        uncertainty: Optional[UncertaintyBlock] = None,
-        calibration_state: Optional[CalibrationState] = None,
+        quality: QualityMetrics | None = None,
+        uncertainty: UncertaintyBlock | None = None,
+        calibration_state: CalibrationState | None = None,
         add_flags: Sequence[AnomalyFlag] = (),
-        degradation: Optional[DegradationState] = None,
-        validity: Optional[ValidityState] = None,
-    ) -> "EvidenceEnvelope":
+        degradation: DegradationState | None = None,
+        validity: ValidityState | None = None,
+    ) -> EvidenceEnvelope:
         """
         Build a downstream envelope from this one (plus any co-inputs).
 
@@ -299,7 +307,7 @@ class EvidenceEnvelope(_Base):
             anomaly_flags=merged_flags,
         )
 
-    def with_content_hash(self, payload: bytes | str | dict[str, Any]) -> "EvidenceEnvelope":
+    def with_content_hash(self, payload: bytes | str | dict[str, Any]) -> EvidenceEnvelope:
         """Attach a sha256 of the payload. PRAMAN requires this on sealed artifacts."""
         if isinstance(payload, dict):
             raw = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()

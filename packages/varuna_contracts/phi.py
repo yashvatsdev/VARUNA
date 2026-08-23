@@ -12,8 +12,7 @@ reads them; it does not re-derive them.
 from __future__ import annotations
 
 from datetime import datetime
-from enum import Enum
-from typing import Optional
+from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -21,8 +20,12 @@ from varuna_contracts.evidence import EvidenceEnvelope
 from varuna_contracts.schemas import BBox, GeoPoint
 
 __all__ = [
-    "ConvergenceFlag", "SpatialMode", "TimeDistribution",
-    "PhiDiagnostics", "SensitivityBlock", "PhiField",
+    "ConvergenceFlag",
+    "PhiDiagnostics",
+    "PhiField",
+    "SensitivityBlock",
+    "SpatialMode",
+    "TimeDistribution",
 ]
 
 
@@ -30,7 +33,7 @@ class _Base(BaseModel):
     model_config = ConfigDict(extra="forbid", validate_assignment=True)
 
 
-class ConvergenceFlag(str, Enum):
+class ConvergenceFlag(StrEnum):
     CONVERGED = "converged"
     MARGINAL = "marginal"
     NOT_CONVERGED = "not_converged"
@@ -47,7 +50,7 @@ class SpatialMode(_Base):
     mass: float = Field(..., ge=0, le=1)
     area_km2: float = Field(..., ge=0)
     peak_time_unix: float
-    separation_km: Optional[float] = Field(None, ge=0)  # distance to nearest other mode
+    separation_km: float | None = Field(None, ge=0)  # distance to nearest other mode
 
 
 class TimeDistribution(_Base):
@@ -59,7 +62,7 @@ class TimeDistribution(_Base):
     p95_unix: float
 
     @model_validator(mode="after")
-    def _shapes(self) -> "TimeDistribution":
+    def _shapes(self) -> TimeDistribution:
         if len(self.mass) != len(self.time_edges_unix) - 1:
             raise ValueError("mass must have len(time_edges) - 1 entries")
         if self.p05_unix > self.p95_unix:
@@ -152,11 +155,11 @@ class PhiField(_Base):
 
     forcing_current_source: str
     forcing_wind_source: str
-    weathering_model: Optional[str] = None
+    weathering_model: str | None = None
 
     envelope: EvidenceEnvelope
-    created_at: Optional[datetime] = None
+    created_at: datetime | None = None
 
     @property
-    def primary_mode(self) -> Optional[SpatialMode]:
+    def primary_mode(self) -> SpatialMode | None:
         return max(self.spatial_modes, key=lambda m: m.mass) if self.spatial_modes else None

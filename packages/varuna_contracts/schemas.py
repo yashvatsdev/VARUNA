@@ -12,30 +12,44 @@ Conventions:
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from enum import Enum
-from typing import Any, Optional
+from datetime import UTC, datetime
+from enum import StrEnum
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 __all__ = [
-    "SlickClass", "LookAlikeType", "VerdictType", "ForcingErrorLevel",
-    "VesselType", "AssetType", "CaseStatus", "OfficerDecision",
-    "GeoPoint", "BBox",
-    "SlickDetection",
-    "AISPoint", "AISGap", "VesselTrack",
-    "PhiFieldMeta",
-    "EmissionPrior", "VesselScore", "LatentSourceScore", "AttributionResult",
-    "DarkVesselDetection",
-    "LandfallPrediction", "ForwardForecast",
-    "SearchBox", "AssetTasking",
-    "EvidenceManifest",
+    "AISGap",
+    "AISPoint",
+    "AssetTasking",
+    "AssetType",
+    "AttributionResult",
+    "BBox",
     "Case",
+    "CaseStatus",
+    "DarkVesselDetection",
+    "EmissionPrior",
+    "EvidenceManifest",
+    "ForcingErrorLevel",
+    "ForwardForecast",
+    "GeoPoint",
+    "LandfallPrediction",
+    "LatentSourceScore",
+    "LookAlikeType",
+    "OfficerDecision",
+    "PhiFieldMeta",
+    "SearchBox",
+    "SlickClass",
+    "SlickDetection",
+    "VerdictType",
+    "VesselScore",
+    "VesselTrack",
+    "VesselType",
 ]
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class _Base(BaseModel):
@@ -48,13 +62,13 @@ class _Base(BaseModel):
 
 # ───────────────────────── Enums ─────────────────────────
 
-class SlickClass(str, Enum):
+class SlickClass(StrEnum):
     OIL = "oil"
     LOOK_ALIKE = "look_alike"
     AMBIGUOUS = "ambiguous"
 
 
-class LookAlikeType(str, Enum):
+class LookAlikeType(StrEnum):
     LOW_WIND = "low_wind"
     ALGAL_BLOOM = "algal_bloom"
     RAIN_CELL = "rain_cell"
@@ -63,20 +77,20 @@ class LookAlikeType(str, Enum):
     UNKNOWN = "unknown"
 
 
-class VerdictType(str, Enum):
+class VerdictType(StrEnum):
     """M10 output. INCONCLUSIVE is a first-class result, not an error."""
     VESSEL_ATTRIBUTED = "vessel_attributed"
     LATENT_SOURCE_DOMINANT = "latent_source_dominant"
     INCONCLUSIVE = "inconclusive"
 
 
-class ForcingErrorLevel(str, Enum):
+class ForcingErrorLevel(StrEnum):
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
 
 
-class VesselType(str, Enum):
+class VesselType(StrEnum):
     TANKER = "tanker"
     CARGO = "cargo"
     FISHING = "fishing"
@@ -86,13 +100,13 @@ class VesselType(str, Enum):
     UNKNOWN = "unknown"
 
 
-class AssetType(str, Enum):
+class AssetType(StrEnum):
     DORNIER = "dornier"
     OPV = "opv"
     STATION_BOAT = "station_boat"
 
 
-class CaseStatus(str, Enum):
+class CaseStatus(StrEnum):
     DETECTED = "detected"
     BACKTRACKED = "backtracked"
     ATTRIBUTED = "attributed"
@@ -101,7 +115,7 @@ class CaseStatus(str, Enum):
     CLOSED = "closed"
 
 
-class OfficerDecision(str, Enum):
+class OfficerDecision(StrEnum):
     PENDING = "pending"
     ACCEPTED = "accepted"
     REJECTED = "rejected"
@@ -122,7 +136,7 @@ class BBox(_Base):
     max_lat: float = Field(..., ge=-90, le=90)
 
     @model_validator(mode="after")
-    def _ordered(self) -> "BBox":
+    def _ordered(self) -> BBox:
         if self.min_lon >= self.max_lon:
             raise ValueError("min_lon must be < max_lon")
         if self.min_lat >= self.max_lat:
@@ -149,7 +163,7 @@ class SlickDetection(_Base):
 
     classification: SlickClass
     confidence: float = Field(..., ge=0, le=1)
-    look_alike_type: Optional[LookAlikeType] = None
+    look_alike_type: LookAlikeType | None = None
 
     mask_path: str                       # MinIO key or local path, uint8 GeoTIFF
     centroid: GeoPoint
@@ -165,7 +179,7 @@ class SlickDetection(_Base):
     age_prior_mean_hours: float = Field(..., gt=0)
     age_prior_std_hours: float = Field(..., gt=0)
 
-    mean_wind_speed_ms: Optional[float] = Field(None, ge=0)
+    mean_wind_speed_ms: float | None = Field(None, ge=0)
     netra_model_version: str = "unset"
 
     @field_validator("observation_time")
@@ -173,7 +187,7 @@ class SlickDetection(_Base):
     def _tz_aware(cls, v: datetime) -> datetime:
         if v.tzinfo is None:
             raise ValueError("observation_time must be timezone-aware UTC")
-        return v.astimezone(timezone.utc)
+        return v.astimezone(UTC)
 
 
 # ───────────────────────── AIS (M6) ─────────────────────────
@@ -182,9 +196,9 @@ class AISPoint(_Base):
     timestamp: datetime
     lon: float = Field(..., ge=-180, le=180)
     lat: float = Field(..., ge=-90, le=90)
-    sog_knots: Optional[float] = Field(None, ge=0, le=60)
-    cog_deg: Optional[float] = Field(None, ge=0, lt=360)
-    heading_deg: Optional[float] = Field(None, ge=0, lt=360)
+    sog_knots: float | None = Field(None, ge=0, le=60)
+    cog_deg: float | None = Field(None, ge=0, lt=360)
+    heading_deg: float | None = Field(None, ge=0, lt=360)
     interpolated: bool = False
     position_std_km: float = Field(0.0, ge=0)   # inflated across gaps, never silently
 
@@ -199,11 +213,11 @@ class AISGap(_Base):
 class VesselTrack(_Base):
     """A cleaned, gap-annotated vessel trajectory. NYAYA scores these against Phi."""
     mmsi: str
-    imo: Optional[str] = None
-    name: Optional[str] = None
+    imo: str | None = None
+    name: str | None = None
     vessel_type: VesselType = VesselType.UNKNOWN
-    length_m: Optional[float] = Field(None, gt=0)
-    width_m: Optional[float] = Field(None, gt=0)
+    length_m: float | None = Field(None, gt=0)
+    width_m: float | None = Field(None, gt=0)
 
     points: list[AISPoint] = Field(..., min_length=2)
     gaps: list[AISGap] = Field(default_factory=list)
@@ -291,7 +305,7 @@ class EmissionPrior(_Base):
 class VesselScore(_Base):
     """One candidate's full scoring breakdown. Every field is shown in the UI."""
     mmsi: str
-    vessel_name: Optional[str] = None
+    vessel_name: str | None = None
     vessel_type: VesselType = VesselType.UNKNOWN
 
     path_integral: float = Field(..., ge=0)          # L_k = sum Phi(x_k(t),y_k(t),t) dt
@@ -320,8 +334,8 @@ class LatentSourceScore(_Base):
     posterior: float = Field(..., ge=0, le=1)
 
     inferred_track: list[GeoPoint] = Field(default_factory=list)
-    inferred_release_point: Optional[GeoPoint] = None
-    inferred_release_time: Optional[datetime] = None
+    inferred_release_point: GeoPoint | None = None
+    inferred_release_time: datetime | None = None
     dark_detection_ids: list[str] = Field(default_factory=list)   # CHHAYA cross-ref
 
 
@@ -335,20 +349,20 @@ class AttributionResult(_Base):
     vessel_scores: list[VesselScore]                 # sorted by posterior desc
     latent_source: LatentSourceScore
 
-    top1_mmsi: Optional[str] = None
+    top1_mmsi: str | None = None
     top1_posterior: float = Field(0.0, ge=0, le=1)
     posterior_entropy: float = Field(..., ge=0)      # high entropy -> INCONCLUSIVE
 
     calibrated: bool = False
-    calibration_model_version: Optional[str] = None
-    ece: Optional[float] = Field(None, ge=0, le=1)   # from the eval harness, not per-case
+    calibration_model_version: str | None = None
+    ece: float | None = Field(None, ge=0, le=1)   # from the eval harness, not per-case
 
     n_candidates_screened: int = Field(..., ge=0)
     n_candidates_scored: int = Field(..., ge=0)
     computed_at: datetime = Field(default_factory=_utcnow)
 
     @model_validator(mode="after")
-    def _sorted_and_normalised(self) -> "AttributionResult":
+    def _sorted_and_normalised(self) -> AttributionResult:
         ps = [v.posterior for v in self.vessel_scores]
         if ps != sorted(ps, reverse=True):
             raise ValueError("vessel_scores must be sorted by posterior descending")
@@ -364,11 +378,11 @@ class DarkVesselDetection(_Base):
     detection_id: str
     scene_id: str
     position: GeoPoint
-    length_m: Optional[float] = Field(None, gt=0)
+    length_m: float | None = Field(None, gt=0)
     confidence: float = Field(..., ge=0, le=1)
-    matched_mmsi: Optional[str] = None
+    matched_mmsi: str | None = None
     is_dark: bool = True                             # no AIS within match radius
-    distance_to_slick_km: Optional[float] = Field(None, ge=0)
+    distance_to_slick_km: float | None = Field(None, ge=0)
 
 
 # ───────────────────────── PRAVAAH (M11) ─────────────────────────
@@ -424,7 +438,7 @@ class EvidenceManifest(_Base):
     phi_checksum: str                                # sha256 of the .npz
     posterior_snapshot: dict[str, float]
     chain_of_custody: list[str] = Field(default_factory=list)
-    manifest_checksum: Optional[str] = None
+    manifest_checksum: str | None = None
     created_at: datetime = Field(default_factory=_utcnow)
 
 
@@ -436,14 +450,14 @@ class Case(_Base):
     status: CaseStatus = CaseStatus.DETECTED
 
     detection: SlickDetection
-    phi_meta: Optional[PhiFieldMeta] = None
-    attribution: Optional[AttributionResult] = None
-    forecast: Optional[ForwardForecast] = None
-    tasking: Optional[AssetTasking] = None
+    phi_meta: PhiFieldMeta | None = None
+    attribution: AttributionResult | None = None
+    forecast: ForwardForecast | None = None
+    tasking: AssetTasking | None = None
     dark_detections: list[DarkVesselDetection] = Field(default_factory=list)
-    evidence: Optional[EvidenceManifest] = None
+    evidence: EvidenceManifest | None = None
 
     officer_decision: OfficerDecision = OfficerDecision.PENDING
-    officer_note: Optional[str] = None
+    officer_note: str | None = None
     created_at: datetime = Field(default_factory=_utcnow)
     updated_at: datetime = Field(default_factory=_utcnow)

@@ -9,16 +9,23 @@ make illegal combinations expressible — so `check_case_invariants` can catch t
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from enum import Enum
-from typing import Optional
+from datetime import UTC, datetime
+from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field
 
 __all__ = [
-    "InvestigationState", "OutcomeState", "ResponseState", "EvidenceState",
-    "CaseLifecycle", "MissionState", "CaseStateVector", "MissionRecord",
-    "check_case_invariants", "MISSION_TRANSITIONS", "is_legal_mission_transition",
+    "MISSION_TRANSITIONS",
+    "CaseLifecycle",
+    "CaseStateVector",
+    "EvidenceState",
+    "InvestigationState",
+    "MissionRecord",
+    "MissionState",
+    "OutcomeState",
+    "ResponseState",
+    "check_case_invariants",
+    "is_legal_mission_transition",
 ]
 
 
@@ -28,7 +35,7 @@ class _Base(BaseModel):
 
 # ───────────────────────── The four case axes ─────────────────────────
 
-class InvestigationState(str, Enum):
+class InvestigationState(StrEnum):
     DETECTED = "detected"
     TRIAGED = "triaged"
     VERIFIED = "verified"
@@ -41,7 +48,7 @@ class InvestigationState(str, Enum):
                 "reconstructed", "attributed"].index(self.value)
 
 
-class OutcomeState(str, Enum):
+class OutcomeState(StrEnum):
     PENDING = "pending"
     STRONG_LEAD = "strong_lead"
     WEAK_LEAD = "weak_lead"
@@ -56,7 +63,7 @@ class OutcomeState(str, Enum):
                         OutcomeState.LATENT)
 
 
-class ResponseState(str, Enum):
+class ResponseState(StrEnum):
     NO_ACTION = "no_action"
     MONITORING = "monitoring"
     RECOMMENDATION_READY = "recommendation_ready"
@@ -75,13 +82,13 @@ class ResponseState(str, Enum):
                         ResponseState.ON_STATION, ResponseState.SEARCHING)
 
 
-class EvidenceState(str, Enum):
+class EvidenceState(StrEnum):
     NONE = "none"
     PARTIAL = "partial"
     COMPLETE = "complete"
 
 
-class CaseLifecycle(str, Enum):
+class CaseLifecycle(StrEnum):
     OPEN = "open"
     CLOSED = "closed"
 
@@ -92,7 +99,7 @@ class CaseStateVector(_Base):
     response: ResponseState = ResponseState.NO_ACTION
     evidence: EvidenceState = EvidenceState.NONE
     lifecycle: CaseLifecycle = CaseLifecycle.OPEN
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 def check_case_invariants(s: CaseStateVector) -> list[str]:
@@ -104,7 +111,10 @@ def check_case_invariants(s: CaseStateVector) -> list[str]:
     """
     v: list[str] = []
 
-    if s.outcome is not OutcomeState.PENDING and s.investigation.rank < InvestigationState.ATTRIBUTED.rank:
+    if (
+        s.outcome is not OutcomeState.PENDING
+        and s.investigation.rank < InvestigationState.ATTRIBUTED.rank
+    ):
         v.append("outcome set before investigation reached ATTRIBUTED")
 
     if s.response.is_committed and not s.outcome.supports_dispatch:
@@ -128,7 +138,7 @@ def check_case_invariants(s: CaseStateVector) -> list[str]:
 
 # ───────────────────────── Mission FSM ─────────────────────────
 
-class MissionState(str, Enum):
+class MissionState(StrEnum):
     AVAILABLE = "available"
     RESERVED = "reserved"
     ASSIGNED = "assigned"
@@ -172,23 +182,23 @@ class MissionRecord(_Base):
     asset_id: str
     state: MissionState = MissionState.AVAILABLE
 
-    assigned_at: Optional[datetime] = None
-    acknowledged_at: Optional[datetime] = None
-    on_station_at: Optional[datetime] = None
-    closed_at: Optional[datetime] = None
+    assigned_at: datetime | None = None
+    acknowledged_at: datetime | None = None
+    on_station_at: datetime | None = None
+    closed_at: datetime | None = None
 
     # Human decisions and AI recommendations are stored SEPARATELY and never merged.
     recommended_by_system: bool = True
-    human_approved_by: Optional[str] = None      # user id — required before ASSIGNED
-    human_override_reason: Optional[str] = None
+    human_approved_by: str | None = None      # user id — required before ASSIGNED
+    human_override_reason: str | None = None
 
     state_history: list[tuple[str, datetime]] = Field(default_factory=list)
 
-    def transition(self, dst: MissionState, *, at: Optional[datetime] = None) -> None:
+    def transition(self, dst: MissionState, *, at: datetime | None = None) -> None:
         if not is_legal_mission_transition(self.state, dst):
             raise ValueError(f"illegal mission transition {self.state.value} -> {dst.value}")
         if dst is MissionState.ASSIGNED and not self.human_approved_by:
             raise ValueError("ASSIGNED requires human_approved_by (authorization gate)")
-        ts = at or datetime.now(timezone.utc)
+        ts = at or datetime.now(UTC)
         self.state_history = [*self.state_history, (dst.value, ts)]
         self.state = dst

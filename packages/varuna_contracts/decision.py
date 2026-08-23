@@ -15,20 +15,27 @@ Two things v1 got wrong and this module fixes:
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from enum import Enum
-from typing import Optional
+from datetime import UTC, datetime
+from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from varuna_contracts.evidence import (
-    CalibrationState, EvidenceEnvelope, TrustState, ValidityState,
+    CalibrationState,
+    EvidenceEnvelope,
+    TrustState,
+    ValidityState,
 )
 from varuna_contracts.schemas import GeoPoint, VesselType
 
 __all__ = [
-    "DecisionState", "LatentFinding", "CandidateScore", "PriorContribution",
-    "AttributionResultV2", "ValidityGateResult", "GateCheck",
+    "AttributionResultV2",
+    "CandidateScore",
+    "DecisionState",
+    "GateCheck",
+    "LatentFinding",
+    "PriorContribution",
+    "ValidityGateResult",
 ]
 
 
@@ -36,7 +43,7 @@ class _Base(BaseModel):
     model_config = ConfigDict(extra="forbid", validate_assignment=True)
 
 
-class DecisionState(str, Enum):
+class DecisionState(StrEnum):
     STRONG_LEAD = "strong_lead"
     WEAK_LEAD = "weak_lead"
     NOT_DISTINGUISHABLE = "not_distinguishable"   # candidates exist, cannot separate
@@ -44,7 +51,7 @@ class DecisionState(str, Enum):
     INCONCLUSIVE = "inconclusive"                 # evidence insufficient at all
 
 
-class LatentFinding(str, Enum):
+class LatentFinding(StrEnum):
     """
     CHHAYA must NOT jump straight to 'dark vessel'. These are different claims
     with different evidential weight, and conflating them is how a system ends up
@@ -69,7 +76,7 @@ class PriorContribution(_Base):
 
 class CandidateScore(_Base):
     mmsi: str
-    vessel_name: Optional[str] = None
+    vessel_name: str | None = None
     vessel_type: VesselType = VesselType.UNKNOWN
 
     path_integral: float = Field(..., ge=0)        # evidence contribution
@@ -96,7 +103,7 @@ class AttributionResultV2(_Base):
 
     latent_probability: float = Field(..., ge=0, le=1)
     latent_finding: LatentFinding
-    latent_inferred_point: Optional[GeoPoint] = None
+    latent_inferred_point: GeoPoint | None = None
 
     # Belief vs separation — different questions, reported separately.
     top_posterior: float = Field(0.0, ge=0, le=1)
@@ -105,7 +112,7 @@ class AttributionResultV2(_Base):
     posterior_entropy: float = Field(..., ge=0, le=1)
 
     calibration_state: CalibrationState = CalibrationState.UNCALIBRATED
-    calibration_version: Optional[str] = None
+    calibration_version: str | None = None
 
     phi_quality_summary: str = ""
     phi_multimodal: bool = False
@@ -113,10 +120,10 @@ class AttributionResultV2(_Base):
     n_candidates_scored: int = Field(..., ge=0)
 
     envelope: EvidenceEnvelope
-    computed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    computed_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     @model_validator(mode="after")
-    def _normalised(self) -> "AttributionResultV2":
+    def _normalised(self) -> AttributionResultV2:
         ps = [c.posterior for c in self.candidates]
         if ps != sorted(ps, reverse=True):
             raise ValueError("candidates must be sorted by posterior descending")
@@ -133,8 +140,8 @@ class AttributionResultV2(_Base):
 class GateCheck(_Base):
     name: str
     passed: bool
-    observed: Optional[float] = None
-    threshold: Optional[float] = None
+    observed: float | None = None
+    threshold: float | None = None
     detail: str = ""
 
 
@@ -154,10 +161,10 @@ class ValidityGateResult(_Base):
 
     source_trust: TrustState = TrustState.TRUSTED
     envelope: EvidenceEnvelope
-    evaluated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    evaluated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     @model_validator(mode="after")
-    def _consistent(self) -> "ValidityGateResult":
+    def _consistent(self) -> ValidityGateResult:
         failed = [c.name for c in self.checks if not c.passed]
         if failed and self.state is ValidityState.VALID:
             raise ValueError(f"state=VALID but checks failed: {failed}")
